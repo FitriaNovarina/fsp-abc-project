@@ -1,21 +1,66 @@
 import pandas as pd
 import numpy as np
+import re
 
 import plotly.express as px
 
 def validate_and_preprocess(df):
-    if 'Projek' not in df.columns:
-        return False, "Gagal: Kolom 'Projek' tidak ditemukan. Pastikan format CSV sesuai.", None
-    
-    if df.isnull().values.any():
-        return False, "Gagal: Terdapat data kosong pada dataset. Harap periksa kembali file Anda.", None
-    
+    # Pastikan ada kolom Projek; jika tidak persis, gunakan kolom pertama atau nama mirip
+    cols_lower = [c.lower() for c in df.columns]
+    if 'projek' in cols_lower:
+        projek_col = df.columns[cols_lower.index('projek')]
+        if projek_col != 'Projek':
+            df = df.rename(columns={projek_col: 'Projek'})
+    else:
+        # Asumsikan kolom pertama adalah kolom projek
+        first_col = df.columns[0]
+        if first_col != 'Projek':
+            df = df.rename(columns={first_col: 'Projek'})
+
+    # Normalisasi nilai pada kolom 'Projek'
+    # Contoh input: 'J1', 'J2', '1', 'Proj-3' -> keluaran numeric 1,2,3
+    orig_vals = df['Projek'].astype(str).tolist()
+    assigned = {}
+    used_nums = set()
+    next_seq = 1
+    for v in orig_vals:
+        if v in assigned:
+            continue
+        s = str(v).strip()
+        m = re.search(r"(\d+)", s)
+        if m:
+            num = int(m.group(1))
+            assigned[v] = num
+            used_nums.add(num)
+        else:
+            # cari nomor unused berikutnya
+            while next_seq in used_nums:
+                next_seq += 1
+            assigned[v] = next_seq
+            used_nums.add(next_seq)
+            next_seq += 1
+
+    df['Projek'] = df['Projek'].astype(str).map(assigned).astype(int)
+
+    # Pastikan kolom 'Projek' adalah kolom pertama
+    cols = df.columns.tolist()
+    if cols[0] != 'Projek':
+        cols.remove('Projek')
+        cols = ['Projek'] + cols
+        df = df[cols]
+
+    # Konversi kolom durasi tahap menjadi numeric
+    non_projek_cols = [c for c in df.columns if c != 'Projek']
     try:
-        for col in df.columns:
+        for col in non_projek_cols:
             df[col] = pd.to_numeric(df[col])
-    except ValueError:
-        return False, "Gagal: Terdapat huruf pada kolom durasi. Harap masukkan angka saja.", None
-        
+    except Exception:
+        return False, f"Gagal: Kolom '{col}' mengandung nilai non-numerik. Harap masukkan angka saja.", None
+
+    # Periksa nilai kosong setelah konversi
+    if df.isnull().values.any():
+        return False, "Gagal: Terdapat data kosong pada dataset setelah pra-proses. Harap periksa kembali file Anda.", None
+
     return True, "Data valid dan siap diproses.", df
 
 def calculate_timetable(sequence, df):

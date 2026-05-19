@@ -57,6 +57,7 @@ with tab1:
     with col_param1:
         pop_size = st.number_input("Colony Size", min_value=1, value=3)
         max_iter = st.number_input("Maksimum Iterasi", min_value=1, value=60)
+        num_trials_main = st.number_input("Jumlah Percobaan (untuk tabel uji)", min_value=1, value=3)
     with col_param2:
         limit = st.number_input("Limit Trial", min_value=1, value=5)
         nse = st.number_input("Number of Sequence (NSE)", min_value=1, value=2)
@@ -64,16 +65,37 @@ with tab1:
     if st.button("Jalankan Optimasi", type="primary", disabled=not is_ready):
         progress_bar = st.progress(0)
         with st.spinner("Memproses algoritma..."):
-            best_seq, best_fit, makespan = run_abc(
-                pop_size, max_iter, limit, nse, 
-                st.session_state.df_projek, 
-                progress_callback=progress_bar.progress
-            )
-            
+            # Jalankan beberapa percobaan dengan parameter yang sama dan kumpulkan hasilnya
+            trial_results = []
+            best_seq = None
+            best_fit = -1.0
+            best_makespan = None
+
+            for t in range(int(num_trials_main)):
+                seq, fit, makespan = run_abc(
+                    pop_size, max_iter, limit, nse, 
+                    st.session_state.df_projek, 
+                    progress_callback=None
+                )
+                trial_results.append({
+                    'Percobaan': t+1,
+                    'Fitness': fit,
+                    'Makespan': makespan,
+                    'Sequence': seq
+                })
+
+                if fit > best_fit:
+                    best_fit = fit
+                    best_seq = seq
+                    best_makespan = makespan
+
+                progress_bar.progress((t+1) / int(num_trials_main))
+
             st.session_state.hasil_optimasi = {
                 'sequence': best_seq,
                 'fitness': best_fit,
-                'makespan': makespan
+                'makespan': best_makespan,
+                'trials': trial_results
             }
 
     if st.session_state.hasil_optimasi:
@@ -96,6 +118,37 @@ with tab1:
             csv_data = convert_df_to_csv(df_timetable)
             st.download_button("Unduh Jadwal (CSV)", data=csv_data, file_name="jadwal_optimasi_abc.csv", mime="text/csv", type="primary")
 
+            # Tampilkan Tabel Percobaan dan Grafik jika tersedia
+            if 'trials' in res and res['trials']:
+                st.header("Tabel Hasil Percobaan Parameter")
+                import pandas as _pd
+                df_trials = _pd.DataFrame([{
+                    'Percobaan': r['Percobaan'],
+                    'Fitness': r['Fitness'],
+                    'Makespan': r['Makespan']
+                } for r in res['trials']])
+                st.dataframe(df_trials, use_container_width=True)
+
+                st.subheader("Grafik Fitness per Percobaan")
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    x=df_trials['Percobaan'],
+                    y=df_trials['Fitness'],
+                    mode='lines+markers',
+                    name='Fitness'
+                ))
+                # Garis rata-rata
+                avg_fit = df_trials['Fitness'].mean()
+                fig.add_trace(go.Scatter(
+                    x=df_trials['Percobaan'],
+                    y=[avg_fit]*len(df_trials),
+                    mode='lines',
+                    name='Rata-rata',
+                    line=dict(dash='dash', color='purple')
+                ))
+                fig.update_layout(xaxis_title='Percobaan', yaxis_title='Fitness')
+                st.plotly_chart(fig, use_container_width=True)
+
 # ==========================================
 # TAB 2: PENGUJIAN PARAMETER (ANALISIS)
 # ==========================================
@@ -108,7 +161,7 @@ with tab2:
     col_t1, col_t2 = st.columns(2)
     with col_t1:
         if test_type == "Uji Coba Batas Parameter Iterasi":
-            input_vals = st.text_input("Nilai Iterasi yang diuji (pisahkan dengan koma):", "10, 20, 30, 40, 50, 60")
+            input_vals = st.text_input("Nilai Iterasi yang diuji (pisahkan dengan koma):", "10, 20, 30, 40, 50, 60, 70, 80")
             fixed_val = st.number_input("Nilai Limit Tetap:", value=5)
             param_name = "Iterasi"
         else:
