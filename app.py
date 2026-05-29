@@ -127,7 +127,9 @@ with tab1:
                     'Fitness': r['Fitness'],
                     'Makespan': r['Makespan']
                 } for r in res['trials']])
-                st.dataframe(df_trials, use_container_width=True)
+                styled_df_trials = df_trials.style.highlight_min(subset=['Makespan'], color='rgba(46, 204, 113, 0.4)') \
+                                                  .highlight_max(subset=['Fitness'], color='rgba(46, 204, 113, 0.4)')
+                st.dataframe(styled_df_trials, use_container_width=True)
 
                 st.subheader("Grafik Fitness per Percobaan")
                 fig = go.Figure()
@@ -150,29 +152,29 @@ with tab1:
                 st.plotly_chart(fig, use_container_width=True)
 
 # ==========================================
-# TAB 2: PENGUJIAN PARAMETER (ANALISIS)
+# TAB 2: PENGUJIAN PARAMETER 
 # ==========================================
 with tab2:
     st.header("Skenario Pengujian Algoritma")
     st.markdown("Fitur ini menjalankan algoritma berulang kali untuk membuktikan parameter mana yang menghasilkan nilai fitness terbaik, sesuai format jurnal.")
     
-    test_type = st.radio("Pilih Parameter yang Akan Diuji:", ["Uji Coba Batas Parameter Iterasi", "Uji Coba Batas Parameter Limit"])
+    test_type = st.radio("Pilih Parameter yang Akan Diuji", ["Uji Coba Batas Parameter Iterasi", "Uji Coba Batas Parameter Limit"])
     
     col_t1, col_t2 = st.columns(2)
     with col_t1:
         if test_type == "Uji Coba Batas Parameter Iterasi":
-            input_vals = st.text_input("Nilai Iterasi yang diuji (pisahkan dengan koma):", "10, 20, 30, 40, 50, 60, 70, 80")
-            fixed_val = st.number_input("Nilai Limit Tetap:", value=5)
+            input_vals = st.text_input("Nilai Iterasi yang diuji (pisahkan dengan koma)", "10, 20, 30, 40, 50, 60, 70, 80")
+            fixed_val = st.number_input("Nilai Limit Tetap", value=5)
             param_name = "Iterasi"
         else:
-            input_vals = st.text_input("Nilai Limit yang diuji (pisahkan dengan koma):", "5, 10, 15, 20, 25, 30")
-            fixed_val = st.number_input("Nilai Iterasi Tetap:", value=60)
+            input_vals = st.text_input("Nilai Limit yang diuji (pisahkan dengan koma)", "5, 10, 15, 20, 25, 30")
+            fixed_val = st.number_input("Nilai Iterasi Tetap", value=60)
             param_name = "Limit"
             
     with col_t2:
-        num_trials = st.number_input("Jumlah Percobaan per Nilai (Sesuai jurnal = 3):", min_value=1, value=3)
-        test_pop_size = st.number_input("Colony Size Tetap:", min_value=1, value=3)
-        test_nse = st.number_input("NSE Tetap:", min_value=1, value=2)
+        num_trials = st.number_input("Jumlah Percobaan per Nilai", min_value=1, value=3)
+        test_pop_size = st.number_input("Colony Size Tetap", min_value=1, value=3)
+        test_nse = st.number_input("NSE Tetap", min_value=1, value=2)
 
     if st.button("Jalankan Pengujian", type="primary", disabled=not is_ready):
         # 1. Parsing input nilai (mengubah teks "10, 20..." menjadi list angka [10, 20...])
@@ -218,7 +220,8 @@ with tab2:
         df_results = pd.DataFrame(results_data)
         st.success("Pengujian selesai!")
         st.subheader(f"Tabel {test_type}")
-        st.dataframe(df_results, use_container_width=True)
+        styled_df_results = df_results.style.highlight_max(subset=['Rata - Rata Fitness'], color='rgba(46, 204, 113, 0.4)')
+        st.dataframe(styled_df_results, use_container_width=True)
 
         # 4. Membuat Visualisasi Grafik Garis (Line Chart) seperti Jurnal
         st.subheader("Grafik Hasil Pengujian")
