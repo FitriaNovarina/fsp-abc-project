@@ -105,5 +105,3 @@ mendapatkan hasil iterasi 60 sebagai nilai fitness terbaik
 yaitu 5 parameter Limit
 - Refrensi Github untuk dataset diluar gumcode sebagai berikut https://github.com/akilelkamel/fssp-dataset
 
-
-Semoga membantu! Jika ingin dokumentasi tambahan atau contoh dataset, saya bisa bantu tambahkan juga.
