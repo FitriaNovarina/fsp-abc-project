@@ -170,10 +170,12 @@ with tab1:
             if 'trials' in res and res['trials']:
                 st.header("Tabel Hasil Percobaan Parameter")
                 import pandas as _pd
+               # --- MODIFIKASI DILAKUKAN DI SINI ---
                 df_trials = _pd.DataFrame([{
                     'Percobaan': r['Percobaan'],
                     'Fitness': r['Fitness'],
-                    'Makespan': r['Makespan']
+                    'Makespan': r['Makespan'],
+                    'Urutan Pengerjaan': " ➔ ".join([str(x) for x in r['Sequence']]) # Tambahan kolom sequence
                 } for r in res['trials']])
                 
                 styled_df_trials = df_trials.style.highlight_min(subset=['Makespan'], color='rgba(46, 204, 113, 0.4)') \
@@ -199,7 +201,6 @@ with tab1:
                 ))
                 fig.update_layout(xaxis_title='Percobaan', yaxis_title='Fitness')
                 st.plotly_chart(fig, use_container_width=True)
-
 # ==========================================
 # TAB 2: PENGUJIAN PARAMETER 
 # ==========================================
