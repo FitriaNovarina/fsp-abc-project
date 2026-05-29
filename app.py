@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from logic.abc_algorithm import run_abc
+from logic.abc_algorithm import run_abc, calculate_makespan
 from utils.utils import (
     validate_and_preprocess, 
     calculate_timetable, 
@@ -46,7 +46,7 @@ if raw_df is not None:
 is_ready = st.session_state.df_projek is not None
 
 # -- MEMBUAT TAB UNTUK MEMISAHKAN FITUR --
-tab1, tab2 = st.tabs(["Optimasi Utama", "Pengujian Parameter (Analisis)"])
+tab1, tab2 = st.tabs(["Optimasi Utama", "Pengujian Parameter"])
 
 # ==========================================
 # TAB 1: OPTIMASI UTAMA (OPERASIONAL)
@@ -107,16 +107,64 @@ with tab1:
             st.warning("Dataset telah berubah. Silakan klik tombol 'Jalankan Optimasi' kembali.")
         else:
             st.header("Hasil Optimasi Penjadwalan")
-            col_res1, col_res2, col_res3 = st.columns(3)
-            col_res1.metric("Waktu Pengerjaan Total", f"{res['makespan']} Pekan")
-            col_res2.metric("Nilai Fitness", f"{res['fitness']:.5f}")
-            col_res3.metric("Urutan Terbaik", " ➔ ".join([str(x) for x in res['sequence']]))
+            
+            # Komparasi Efisiensi dengan Baseline (FCFS)
+            st.subheader("Komparasi Efisiensi (FCFS vs ABC)")
+            
+            # 1. Hitung Baseline (Sebelum Optimasi) dengan urutan asli dataset
+            baseline_seq = df_data['Projek'].tolist()
+            baseline_makespan = calculate_makespan(baseline_seq, df_data)
+            
+            # 2. Hitung Selisih dan Efisiensi
+            selisih_waktu = baseline_makespan - res['makespan']
+            efisiensi = (selisih_waktu / baseline_makespan) * 100 if baseline_makespan > 0 else 0
+            
+            # 3. Tampilkan metrik perbandingan
+            col_comp1, col_comp2, col_comp3 = st.columns(3)
+            col_comp1.metric(
+                label="Makespan Awal (Sebelum Optimasi)", 
+                value=f"{baseline_makespan} Pekan"
+            )
+            col_comp2.metric(
+                label="Makespan Optimal (Hasil ABC)", 
+                value=f"{res['makespan']} Pekan", 
+                delta=f"-{selisih_waktu} Pekan (Lebih Cepat)",
+                delta_color="inverse" 
+            )
+            col_comp3.metric(
+                label="Tingkat Efisiensi", 
+                value=f"{efisiensi:.2f}%"
+            )
+            with st.expander("Lihat Detail Perhitungan Sebelum Optimasi (Metode FCFS)"):
+                st.markdown("Tabel di bawah ini menunjukkan simulasi waktu pengerjaan (dalam pekan) jika proyek dikerjakan murni sesuai **urutan kedatangan (indeks awal)** tanpa optimasi algoritma.")
+                
+                # 1. Dapatkan tabel perhitungan lengkap
+                baseline_timetable = calculate_timetable(baseline_seq, df_data)
+                
+                # 2. Filter DataFrame: Sembunyikan kolom yang mengandung kata "Durasi"
+                kolom_tampil = [col for col in baseline_timetable.columns if 'Durasi' not in str(col)]
+                df_tampil = baseline_timetable[kolom_tampil]
+                
+                # 3. Menampilkan tabel dan menyoroti kolom waktu selesai terakhir
+                st.dataframe(
+                    df_tampil.style.highlight_max(
+                        subset=[df_tampil.columns[-1]], 
+                        color='rgba(231, 76, 60, 0.4)' 
+                    ), 
+                    use_container_width=True
+                )
+            st.divider()
+            
+            st.subheader("Detail Solusi Terbaik")
+            col_res1, col_res2 = st.columns(2)
+            col_res1.metric("Nilai Fitness", f"{res['fitness']:.5f}")
+            col_res2.metric("Urutan Terbaik", " ➔ ".join([str(x) for x in res['sequence']]))
             
             df_timetable = calculate_timetable(res['sequence'], df_data)
             st.plotly_chart(generate_gantt_chart(df_timetable), use_container_width=True)
             
             csv_data = convert_df_to_csv(df_timetable)
-            st.download_button("Unduh Jadwal (CSV)", data=csv_data, file_name="jadwal_optimasi_abc.csv", mime="text/csv", type="primary")
+            st.download_button("Unduh Jadwal Optimal (CSV)", data=csv_data, file_name="jadwal_optimasi_abc.csv", mime="text/csv", type="primary")
 
             # Tampilkan Tabel Percobaan dan Grafik jika tersedia
             if 'trials' in res and res['trials']:
@@ -127,6 +175,7 @@ with tab1:
                     'Fitness': r['Fitness'],
                     'Makespan': r['Makespan']
                 } for r in res['trials']])
+                
                 styled_df_trials = df_trials.style.highlight_min(subset=['Makespan'], color='rgba(46, 204, 113, 0.4)') \
                                                   .highlight_max(subset=['Fitness'], color='rgba(46, 204, 113, 0.4)')
                 st.dataframe(styled_df_trials, use_container_width=True)
